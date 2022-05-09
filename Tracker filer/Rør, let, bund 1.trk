@@ -3,14 +3,14 @@
     <property name="semantic_version" type="string">6.0.8</property>
     <property name="width" type="double">1920.0</property>
     <property name="height" type="double">1080.0</property>
-    <property name="magnification" type="double">2.244924096618746</property>
-    <property name="center_x" type="int">2359</property>
-    <property name="center_y" type="int">1133</property>
+    <property name="magnification" type="double">0.5</property>
+    <property name="center_x" type="int">326</property>
+    <property name="center_y" type="int">274</property>
     <property name="videoclip" type="object">
     <object class="org.opensourcephysics.media.core.VideoClip">
         <property name="video" type="object">
         <object class="org.opensourcephysics.media.xuggle.XuggleVideo">
-            <property name="path" type="string">../Videoer/Done/Rør, let, bund 1.mp4</property>
+            <property name="path" type="string">../Videoer/Rør, let, bund 1.mp4</property>
         </object>
         </property>
         <property name="video_framecount" type="int">224</property>
@@ -1001,7 +1001,7 @@
     </property>
     <property name="selectedtrack" type="string">Akser</property>
     <property name="dividers" type="array" class="[D">
-        <property name="array" type="string">{0.570273003033367,0.5718799368088467,1.0,0.2810920121334681}</property>
+        <property name="array" type="string">{0.570273003033367,0.5750394944707741,1.0,0.2810920121334681}</property>
     </property>
     <property name="views" type="array" class="[[Lorg.opensourcephysics.cabrillo.tracker.TView;">
         <property name="[0]" type="array" class="[Lorg.opensourcephysics.cabrillo.tracker.TView;">
@@ -1015,7 +1015,7 @@
                         <property name="plot0" type="object">
                         <object class="org.opensourcephysics.cabrillo.tracker.TrackPlottingPanel">
                             <property name="x_var" type="string">t: tid</property>
-                            <property name="y_var" type="string">vy: hastighed y-komposant</property>
+                            <property name="y_var" type="string">ay: acceleration y-komposant</property>
                             <property name="lines" type="boolean">true</property>
                             <property name="points" type="boolean">true</property>
                         </object>
