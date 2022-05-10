@@ -54,7 +54,7 @@ Objekt til at gemme på værdier som gælder for hele undersøgelsen, dvs. vægt
 """
 #K
 class diverseVærdier:
-    fps = 60.0
+    fps = 240.0
     m_tung = 20.2*10**(-3)
     m_medium = 9.5*10**(-3)
     m_let = 5.1*10**(-3)
@@ -221,10 +221,10 @@ und = undersøgelse("./Datafiler/")
 fig, ax = plt.subplots(1,1)
 
 
-vedMunding = divideBy([und.rør.ys,und.rør.vs,und.rør.Fs],0,0,0.1,10)[0]
+vedMunding = divideBy([und.rør.ys,und.rør.vs,und.rør.Fs],0,0,0.1,5)[4]
 #print(len(vedMunding))
-
-ax.plot(vedMunding[0],vedMunding[2],ls = "None", marker = ".")
+ax.plot(und.rør.ys,und.rør.Fs,ls = "None", marker = ".")
+#ax.plot(vedMunding[0],vedMunding[2],ls = "None", marker = ".")
 ax.set_ylabel(r"$F_{brems} \quad [N]$")
 ax.set_xlabel(r"$v \quad [m/s]$")
 ax.grid()
