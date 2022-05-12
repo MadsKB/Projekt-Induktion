@@ -82,6 +82,12 @@ class diverseVærdier:
     lowLim = 0.4
     highLim = 0.4
 
+    errdataFile = ""
+
+    t,ylod1,ylod2,ylod3,ylod4 = np.loadtxt(errdata, unpack = True, usecols=(0,1,2,3,4), skiprows=3)
+    yerr = sum((abs(ylod1-ylod2)+abs(ylod3-ylod4))/2)/len(ylod1)
+
+
 
 """
 Objekt til at hånterer en video/måling
@@ -125,7 +131,9 @@ class Maaling(diverseVærdier):
         """
 
         self.ys = -self.yLod+self.offset
-        self.ys_unc = np.zeros(len(self.ys))
+        self.ys_unc = np.full(len(self.ys), self.yerr)
+
+        #self.ys_unc = np.zeros(len(self.ys))
 
         """
         Vi finder magnetens hastighed
@@ -168,7 +176,7 @@ class Maaling(diverseVærdier):
         #try:
         print(self.file, len(self.ys_inLeder))
         #sigma = self.ys_unc_inLeder
-        parms, pcov = sc.curve_fit(fitter, self.ts_inLeder , self.ys_inLeder,p0 = [self.g,-1,0] , absolute_sigma = True, maxfev = 1000000)
+        parms, pcov = sc.curve_fit(fitter, self.ts_inLeder , self.ys_inLeder,p0 = [self.g,-1,0],yerr= self.ys_unc_inLeder , absolute_sigma = True, maxfev = 1000000)
         print(pcov)
         print(parms)
         self.a_in = parms[0]
