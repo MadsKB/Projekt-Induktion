@@ -82,9 +82,9 @@ class diverseVærdier:
     lowLim = 0.4
     highLim = 0.4
 
-    errdataFile = ""
+    errdataFile = "Induktionsbremse fejltest.txt"
 
-    t,ylod1,ylod2,ylod3,ylod4 = np.loadtxt(errdata, unpack = True, usecols=(0,1,2,3,4), skiprows=3)
+    t,ylod1,ylod2,ylod3,ylod4 = np.loadtxt(errdataFile, unpack = True, usecols=(0,1,2,3,4), skiprows=3)
     yerr = sum((abs(ylod1-ylod2)+abs(ylod3-ylod4))/2)/len(ylod1)
 
 
@@ -160,15 +160,13 @@ class Maaling(diverseVærdier):
         self.upperBound = self.highLim
         self.lowerBound = self.lowLim
 
-        print(-self.L*(self.midtPoint-self.lowerBound))
-        print(-self.L*(self.midtPoint+self.upperBound))
-        print("Tjeky", self.ys)
+
         self.inLeder = divideBy([self.ys,self.ys_unc,self.ts],0,-self.L*(self.midtPoint+self.upperBound),-self.L*(self.midtPoint-self.lowerBound),1)[0]
-        print(self.inLeder)
+        print(len(self.ys),len(self.ys_unc))
         self.ys_inLeder = np.array(self.inLeder[0])
         self.ys_unc_inLeder = np.array(self.inLeder[1])
         self.ts_inLeder = np.array(self.inLeder[-1])
-
+        print(len(self.ys_inLeder),len(self.ys_unc_inLeder))
 
         fitter = lambda t, a, v0,y0: 1/2*a*t**2+v0*t+y0
 
@@ -176,17 +174,17 @@ class Maaling(diverseVærdier):
         #try:
         print(self.file, len(self.ys_inLeder))
         #sigma = self.ys_unc_inLeder
-        parms, pcov = sc.curve_fit(fitter, self.ts_inLeder , self.ys_inLeder,p0 = [self.g,-1,0],yerr= self.ys_unc_inLeder , absolute_sigma = True, maxfev = 1000000)
+        parms, pcov = sc.curve_fit(fitter, self.ts_inLeder , self.ys_inLeder,p0 = [self.g,-1,0], sigma= self.ys_unc_inLeder , absolute_sigma = True, maxfev = 1000000)
         print(pcov)
         print(parms)
         self.a_in = parms[0]
         self.v0_in = parms[1]
         self.y0_in = parms[2]
         self.v0_in_unc = np.sqrt(pcov[1,1])
-
+        self.a_in_unc = np.sqrt(pcov[0,0])
 
         self.F_in = self.a_in*(self.m_magnet+self.m_lod)+self.g*(self.m_lod-self.m_magnet)
-        self.F_in_unc = 0
+        self.F_in_unc = self.a_in_unc*abs(self.m_magnet+self.m_lod)
 
 
         #except:
@@ -320,15 +318,15 @@ print(und.rør.newFs)
 #ax.errorbar(und.rør.maalinger[Mål].ts_inLeder,und.rør.maalinger[Mål].ys_inLeder,ls = "None", marker = ".", label = "Rå data Rør")
 #fitted = und.rør.maalinger[Mål].a_in*1/2*np.power(und.rør.maalinger[Mål].ts_inLeder,2)+und.rør.maalinger[Mål].v0_in*und.rør.maalinger[Mål].ts_inLeder+und.rør.maalinger[Mål].y0_in
 #ax.plot(und.rør.maalinger[Mål].ts_inLeder,fitted,ls = "--",marker = "None", label = "Fit til kons. acceleration")
-
-ax.errorbar(und.rør.newVs,und.rør.newFs,ls = "None", marker = ".", label = "Rå data Spole")
+print(und.rør.newVs_unc)
+ax.errorbar(und.rør.newVs,und.rør.newFs,xerr = und.rør.newVs_unc[0:-1],yerr = und.rør.newFs_unc[0:-1],ls = "None", marker = ".", label = "Rå data Spole")
 #yerr = und.rør.newFs_unc,xerr = und.rør.newVs_unc
 
 ax.set_ylabel(r"$F_{brems} \quad [N]$")
 ax.set_xlabel(r"$v \quad [m/s]$")
 
-ax.set_ylabel(r"$y \quad [m]$")
-ax.set_xlabel(r"$ts \quad [s]$")
+#ax.set_ylabel(r"$y \quad [m]$")
+#ax.set_xlabel(r"$ts \quad [s]$")
 
 ax.grid()
 ax.legend()
