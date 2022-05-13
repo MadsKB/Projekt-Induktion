@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.patches import Circle, FancyArrow
 import scipy.optimize as sc
+import scipy.stats as ss
 from scipy.integrate import solve_ivp
 import sympy as sp
 import os
@@ -48,15 +49,12 @@ Udregner chi^2 af fit (chi^2_min)
 def chi2_min(fit,x,y,parms,yerr):
     return np.sum((y-fit(x,*parms))/yerr)
 
-def fitToConstantAcc(ys,yerr,ts):
+def calcP(parms,ys,chi):
+    return ss.chi2.sf(chi,len(ys)-len(parms))
 
-    fitter = lambda t, a, v0, y0: 1/2*a*t**2+v0*t+y0
-
-    parms, pcov = sc.curve_fit(fitter, ts , ys ,p0 = [3,-1], sigma = yerr, absolute_sigma = True, maxfev = 1000000)
-
-
-
-    return parms, pcov
+def fitTo(fit,x,y,yerr, P0):
+    parms, pcov = sc.curve_fit(fit, x , y ,p0 = P0, sigma = yerr, absolute_sigma = True, maxfev = 1000000)
+    return parms, pcov, chi2_min(fit,x,y,parms,yerr), calcP(parms,y,chi2_min(fit,x,y,parms,yerr))
 
 
 
@@ -81,7 +79,7 @@ class diverseVærdier:
     LRør = 0.251
     lowLim = 0.4
     highLim = 0.4
-
+    midtPoint = 1/2
     errdataFile = "Induktionsbremse fejltest.txt"
 
     t,ylod1,ylod2,ylod3,ylod4 = np.loadtxt(errdataFile, unpack = True, usecols=(0,1,2,3,4), skiprows=3)
@@ -156,35 +154,54 @@ class Maaling(diverseVærdier):
 
 
 
-        self.midtPoint = 1/2
+
         self.upperBound = self.highLim
         self.lowerBound = self.lowLim
 
 
-        self.inLeder = divideBy([self.ys,self.ys_unc,self.ts],0,-self.L*(self.midtPoint+self.upperBound),-self.L*(self.midtPoint-self.lowerBound),1)[0]
-        print(len(self.ys),len(self.ys_unc))
-        self.ys_inLeder = np.array(self.inLeder[0])
-        self.ys_unc_inLeder = np.array(self.inLeder[1])
-        self.ts_inLeder = np.array(self.inLeder[-1])
-        print(len(self.ys_inLeder),len(self.ys_unc_inLeder))
+        self.inLeder = divideBy([self.ys,self.ys_unc,self.ts],0,-self.L*(self.midtPoint+self.upperBound),-self.L*(self.midtPoint-self.lowerBound),4)
 
         fitter = lambda t, a, v0,y0: 1/2*a*t**2+v0*t+y0
 
+        self.ys_inLeder     = np.array([])
+        self.ys_unc_inLeder = np.array([])
+        self.ts_inLeder     = np.array([])
+
+        self.a_in   = np.array([])
+        self.v0_in  = np.array([])
+        self.y0_in  = np.array([])
+
+        self.v0_in_unc  = np.array([])
+        self.a_in_unc   = np.array([])
+
+        self.F_in     = np.array([])
+        self.F_in_unc = np.array([])
+        print(self.file)
+        for i,mål in enumerate(self.inLeder):
+            print("På ", i, len(mål[0]))
+            if len(mål[0]) <= 3:
+                continue
+            self.ys_inLeder = np.append(self.ys_inLeder,mål[0])
+            self.ys_unc_inLeder = np.append(self.ys_unc_inLeder,mål[1])
+            self.ts_inLeder = np.append(self.ts_inLeder,mål[-1])
+
+
+
+
         #parms, pcov = sc.curve_fit(fitter, self.ts_inLeder , self.ys_inLeder , sigma = self.ys_unc_inLeder, absolute_sigma = True, maxfev = 1000000)
         #try:
-        print(self.file, len(self.ys_inLeder))
-        #sigma = self.ys_unc_inLeder
-        parms, pcov = sc.curve_fit(fitter, self.ts_inLeder , self.ys_inLeder,p0 = [self.g,-1,0], sigma= self.ys_unc_inLeder , absolute_sigma = True, maxfev = 1000000)
-        print(pcov)
-        print(parms)
-        self.a_in = parms[0]
-        self.v0_in = parms[1]
-        self.y0_in = parms[2]
-        self.v0_in_unc = np.sqrt(pcov[1,1])
-        self.a_in_unc = np.sqrt(pcov[0,0])
 
-        self.F_in = self.a_in*(self.m_magnet+self.m_lod)+self.g*(self.m_lod-self.m_magnet)
-        self.F_in_unc = self.a_in_unc*abs(self.m_magnet+self.m_lod)
+            #sigma = self.ys_unc_inLeder
+            parms, pcov = sc.curve_fit(fitter, mål[-1] , mål[0],p0 = [self.g,-1,0], sigma= mål[1] , absolute_sigma = True, maxfev = 1000000)
+
+            self.a_in   = np.append(self.a_in , parms[0])
+            self.v0_in  = np.append(self.v0_in, parms[1])
+            self.y0_in  = np.append(self.y0_in, parms[2])
+            self.v0_in_unc  = np.append(self.v0_in_unc, np.sqrt(pcov[1,1]))
+            self.a_in_unc   = np.append(self.a_in_unc , np.sqrt(pcov[0,0]))
+
+            self.F_in       = np.append( self.F_in    ,parms[0]*(self.m_magnet+self.m_lod)+self.g*(self.m_lod-self.m_magnet))
+            self.F_in_unc   = np.append( self.F_in_unc,np.sqrt(pcov[0,0])*abs(self.m_magnet+self.m_lod))
 
 
         #except:
@@ -305,7 +322,7 @@ vedMundingSpoleLukket = divideBy([und.SpoleLukket.ys,und.SpoleLukket.vs,und.Spol
 #ax.plot(und.rør.maalinger[0].ts,und.rør.maalinger[0].Fs,ls = "None", marker = ".",label = "rør",alpha = 0.7)
 #ax.plot(und.Spole.vs,und.Spole.Fs,ls = "None", marker = ".", label = "Spole",alpha = 0.7)
 #ax.plot(und.SpoleLukket.vs,und.SpoleLukket.Fs,ls = "None", marker = ".", label = "Spole lukket",alpha = 0.7)
-ax.set_title(r"Postion som funktion af tid" "\n i midten af kobber rør (Indenfor $\pm 0.15 \cdot L_{rør}$ af centrum)")
+
 #ax.errorbar(vedMundingRør[2],vedMundingRør[3],yerr = vedMundingRør[-1],xerr = vedMundingRør[-2],ls = "None", marker = ".", label = "Rå data Rør")
 #ax.errorbar(vedMundingRør[1],vedMundingRør[0],yerr = vedMundingRør[-1],xerr = vedMundingRør[-2],ls = "None", marker = ".", label = "Rå data Rør")
 #ax.errorbar(vedMundingSpole[1],vedMundingSpole[0],yerr = vedMundingSpole[-1],xerr = vedMundingSpole[-2],ls = "None", marker = ".", label = "Rå data Spole")
@@ -319,16 +336,35 @@ print(und.rør.newFs)
 #fitted = und.rør.maalinger[Mål].a_in*1/2*np.power(und.rør.maalinger[Mål].ts_inLeder,2)+und.rør.maalinger[Mål].v0_in*und.rør.maalinger[Mål].ts_inLeder+und.rør.maalinger[Mål].y0_in
 #ax.plot(und.rør.maalinger[Mål].ts_inLeder,fitted,ls = "--",marker = "None", label = "Fit til kons. acceleration")
 print(und.rør.newVs_unc)
-ax.errorbar(und.rør.newVs,und.rør.newFs,xerr = und.rør.newVs_unc[0:-1],yerr = und.rør.newFs_unc[0:-1],ls = "None", marker = ".", label = "Rå data Spole")
+
+lin = lambda x,a: a*x
+
+#ax.errorbar(und.rør.newVs,und.rør.newFs,xerr = und.rør.newVs_unc[0:len(und.rør.newVs)],yerr = und.rør.newFs_unc[0:len(und.rør.newVs)],ls = "None", marker = ".", label = "Data", elinewidth = 0.4)
+#ax.errorbar(und.SpoleLukket.newVs,und.SpoleLukket.newFs,xerr = und.SpoleLukket.newVs_unc[0:len(und.SpoleLukket.newVs)],yerr = und.SpoleLukket.newFs_unc[0:len(und.SpoleLukket.newVs)],ls = "None", marker = ".", label = "Data", elinewidth = 0.4)
+ax.errorbar(und.SpoleLukket.newVs,und.SpoleLukket.newFs,xerr = und.SpoleLukket.newVs_unc[0:len(und.SpoleLukket.newVs)],yerr = und.SpoleLukket.newFs_unc[0:len(und.SpoleLukket.newVs)],ls = "None", marker = ".", label = "Data", elinewidth = 0.4)
+
+
+parms, pcov, chi2_min, P = fitTo(lin,und.SpoleLukket.newVs,und.SpoleLukket.newFs, und.SpoleLukket.newFs_unc[0:len(und.SpoleLukket.newVs)],[-10])
+vs = np.linspace(-30,75,100)
+print(chi2_min)
+
+
+ax.plot(vs,parms[0]*vs,ls = "--",marker = "None", label = "Fit med lineær model; $F = k\cdot v$, \n k = {0:0.3f} \n P-værdi: {1:0.3f}".format(parms[0],P), lw = 1)
+
+
+#ax.errorbar(und.Spole.newVs,und.Spole.newFs,xerr = und.Spole.newVs_unc[0:-1],yerr = und.Spole.newFs_unc[0:-1],ls = "None", marker = ".", label = "Rå data Spole")
 #yerr = und.rør.newFs_unc,xerr = und.rør.newVs_unc
 
-ax.set_ylabel(r"$F_{brems} \quad [N]$")
-ax.set_xlabel(r"$v \quad [m/s]$")
+labelfontsize = 12
+ax.set_title(r"Bremse kraft som funktion af hastighed i 'åben' spole" "\n (Indenfor $\pm 0.4 \cdot L_{spole}$ af centrum)")
+ax.set_ylabel(r"$F_{brems} \quad [N]$", fontsize = labelfontsize)
+ax.set_xlabel(r"$v \quad [m/s]$",       fontsize = labelfontsize)
 
 #ax.set_ylabel(r"$y \quad [m]$")
 #ax.set_xlabel(r"$ts \quad [s]$")
 
 ax.grid()
+ax.tick_params(labelsize = 10)
 ax.legend()
 
 
