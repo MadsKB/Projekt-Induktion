@@ -11,6 +11,73 @@ import os
 import math
 
 
+def findAll(s, ch):
+    return [i for i, ltr in enumerate(s) if ltr == ch]
+
+def insertCharsAtIndexs(s,ch,inds):
+    if inds == []:
+        return s+ch
+    else:
+        inds.insert(0,0)
+        bitsBetween = [s[inds[i]:inds[i+1]] for i in range(0,len(inds)-1)]
+
+        out = ""
+        for bit in bitsBetween:
+            out += bit + ch
+    return out
+
+def errorProp(func, pamVars, inVars, pcov, parms):
+
+    f = sp.sympify(func)
+    if pamVars != "":
+        parmVars = sp.symbols(pamVars)
+    else:
+        parmVars = []
+
+    inErrs = sp.symbols(insertCharsAtIndexs(inVars,"E",findAll(inVars,",")))
+
+    inVars = sp.symbols(inVars)
+    #if type(inVars) != type([]):
+    #    inVars = [inVars]
+    #    inErrs = [inErrs]
+
+    """
+    Vi antager for nu at der ingen kolation er mellem input og noglen af de andre værdier
+    (Idet vi ikke har pcov vars for disse)
+    """
+
+    phiError = f*0
+
+    """
+    Led fra usikkerheder i de individuelle parameter
+    """
+    if parmVars:
+        for i,var in enumerate(parmVars):
+            phiError += (sp.diff(f,var))**2*pcov[i,i]
+
+        """
+        Led fra kolationer
+        """
+        for y in range(0, len(pcov)-1):
+            for x in range(y+1, len(pcov)):
+
+                phiError += (2*sp.diff(f,parmVars[y])*sp.diff(f,parmVars[x])*pcov[y,x]).subs([(parmVars[x],parms[x]),(parmVars[y],parms[y])])
+
+    """
+    Led fra input værdier
+    """
+    #print(phiError)
+    #print(inVars)
+    for i,var in enumerate(inVars):
+        #print(var, i,inErrs[i])
+        phiError += (sp.diff(f,var))**2*inErrs[i]
+    #print(phiError)
+    phiError = phiError.subs([(var,parm) for var,parm in zip(parmVars,parms)])
+
+    return sp.lambdify(inVars + inErrs,sp.sqrt(phiError))
+
+
+
 
 """
 Funktion der deler et array af arrays op efter
@@ -25,15 +92,15 @@ def divideBy(arrays,axis, start, end, num):
     Empt[:] = np.nan
 
     for i in range(0,num):
-        print("kage", i)
-        print(delta)
+        #print("kage", i)
+        #print(delta)
         #print("Start",(start+delta*i))
         #print("End", (delta*(i+1)))
         indexs = np.where(((start+delta*i) <= divider)*(divider < (start+delta*(i+1))),np.array(list(range(len(divider))),dtype = np.int64),Empt)
         #print(indexs)
         indexs = indexs[~(np.isnan(indexs))]
         #print(indexs)
-        print(len(indexs))
+        #print(len(indexs))
         out_array = []
         for array in arrays:
             #print(array)
@@ -72,7 +139,9 @@ class diverseVærdier:
     m_medium = 9.5*10**(-3)
     m_let = 5.1*10**(-3)
     m_magnet = 42.5*10**(-3)
-    g = -9.6
+    g = -9.62
+    gerr = 0.012
+
     spoleOffset = np.mean(np.array([1.323263E-1, 1.174768E-1,1.348158E-1]))
     rørOffset = np.mean(np.array([2.635928E-2,3.777756E-2,-1.330933E-2]))
     LSpole = 0.191
@@ -82,8 +151,12 @@ class diverseVærdier:
     midtPoint = 1/2
     errdataFile = "Induktionsbremse fejltest.txt"
 
+    Merr = 0.0001
+
     t,ylod1,ylod2,ylod3,ylod4 = np.loadtxt(errdataFile, unpack = True, usecols=(0,1,2,3,4), skiprows=3)
     yerr = sum((abs(ylod1-ylod2)+abs(ylod3-ylod4))/2)/len(ylod1)
+
+    FerrFunc = lambda self,a, aE,mLod: np.sqrt(aE*(mLod + 42.5*10**(-3))**2 + 0.012*(mLod - 42.5*10**(-3))**2 + 0.0001*(a-9.62)**2 + 0.0001*(a +9.62)**2)
 
 
 
@@ -176,9 +249,11 @@ class Maaling(diverseVærdier):
 
         self.F_in     = np.array([])
         self.F_in_unc = np.array([])
-        print(self.file)
+
+
+
         for i,mål in enumerate(self.inLeder):
-            print("På ", i, len(mål[0]))
+            #print("På ", i, len(mål[0]))
             if len(mål[0]) <= 3:
                 continue
             self.ys_inLeder = np.append(self.ys_inLeder,mål[0])
@@ -201,7 +276,7 @@ class Maaling(diverseVærdier):
             self.a_in_unc   = np.append(self.a_in_unc , np.sqrt(pcov[0,0]))
 
             self.F_in       = np.append( self.F_in    ,parms[0]*(self.m_magnet+self.m_lod)+self.g*(self.m_lod-self.m_magnet))
-            self.F_in_unc   = np.append( self.F_in_unc,np.sqrt(pcov[0,0])*abs(self.m_magnet+self.m_lod))
+            self.F_in_unc   = np.append( self.F_in_unc, self.FerrFunc(parms[0],np.sqrt(pcov[0,0]),self.m_lod))
 
 
         #except:
@@ -327,39 +402,51 @@ vedMundingSpoleLukket = divideBy([und.SpoleLukket.ys,und.SpoleLukket.vs,und.Spol
 #ax.errorbar(vedMundingRør[1],vedMundingRør[0],yerr = vedMundingRør[-1],xerr = vedMundingRør[-2],ls = "None", marker = ".", label = "Rå data Rør")
 #ax.errorbar(vedMundingSpole[1],vedMundingSpole[0],yerr = vedMundingSpole[-1],xerr = vedMundingSpole[-2],ls = "None", marker = ".", label = "Rå data Spole")
 #ax.errorbar(vedMundingSpoleLukket[1],vedMundingSpoleLukket[2],yerr = vedMundingSpoleLukket[-1],xerr = vedMundingSpoleLukket[-2],ls = "None", marker = ".", label = "Rå data Spole lukket")
-print(und.rør.newVs)
-print(und.rør.newFs)
 
 #ax.errorbar(vedMundingRør[1],vedMundingRør[0],yerr = vedMundingRør[-1],xerr = vedMundingRør[-2],ls = "None", marker = ".", label = "Rå data Rør")
 
 #ax.errorbar(und.rør.maalinger[Mål].ts_inLeder,und.rør.maalinger[Mål].ys_inLeder,ls = "None", marker = ".", label = "Rå data Rør")
 #fitted = und.rør.maalinger[Mål].a_in*1/2*np.power(und.rør.maalinger[Mål].ts_inLeder,2)+und.rør.maalinger[Mål].v0_in*und.rør.maalinger[Mål].ts_inLeder+und.rør.maalinger[Mål].y0_in
 #ax.plot(und.rør.maalinger[Mål].ts_inLeder,fitted,ls = "--",marker = "None", label = "Fit til kons. acceleration")
-print(und.rør.newVs_unc)
 
-lin = lambda x,a: a*x
+
+fit1 = lambda x,a: a*x
+fit2 = lambda x,a,b,c: a*x**5+b*x**3+c*x
+
+#ledende = und.rør
+#ledende = und.Spole
+ledende = und.SpoleLukket
 
 #ax.errorbar(und.rør.newVs,und.rør.newFs,xerr = und.rør.newVs_unc[0:len(und.rør.newVs)],yerr = und.rør.newFs_unc[0:len(und.rør.newVs)],ls = "None", marker = ".", label = "Data", elinewidth = 0.4)
 #ax.errorbar(und.SpoleLukket.newVs,und.SpoleLukket.newFs,xerr = und.SpoleLukket.newVs_unc[0:len(und.SpoleLukket.newVs)],yerr = und.SpoleLukket.newFs_unc[0:len(und.SpoleLukket.newVs)],ls = "None", marker = ".", label = "Data", elinewidth = 0.4)
-ax.errorbar(und.SpoleLukket.newVs,und.SpoleLukket.newFs,xerr = und.SpoleLukket.newVs_unc[0:len(und.SpoleLukket.newVs)],yerr = und.SpoleLukket.newFs_unc[0:len(und.SpoleLukket.newVs)],ls = "None", marker = ".", label = "Data", elinewidth = 0.4)
+#ax.errorbar(und.SpoleLukket.newVs,und.SpoleLukket.newFs,xerr = und.SpoleLukket.newVs_unc[0:len(und.SpoleLukket.newVs)],yerr = und.SpoleLukket.newFs_unc[0:len(und.SpoleLukket.newVs)],ls = "None", marker = ".", label = "Data", elinewidth = 0.4)
+ax.errorbar(ledende.newVs,ledende.newFs,xerr = ledende.newVs_unc[0:len(ledende.newVs)],yerr = ledende.newFs_unc[0:len(ledende.newVs)],ls = "None", marker = ".", label = "Data", elinewidth = 0.4)
 
-
-parms, pcov, chi2_min, P = fitTo(lin,und.SpoleLukket.newVs,und.SpoleLukket.newFs, und.SpoleLukket.newFs_unc[0:len(und.SpoleLukket.newVs)],[-10])
+parms1, pcov1, chi2_min1, P1 = fitTo(fit1,ledende.newVs,ledende.newFs, ledende.newFs_unc[0:len(ledende.newVs)],[-1])
+parms2, pcov2, chi2_min2, P2 = fitTo(fit2,ledende.newVs,ledende.newFs, ledende.newFs_unc[0:len(ledende.newVs)],[0,0,-1])
 vs = np.linspace(-30,75,100)
-print(chi2_min)
+
+print(parms1)
+print(np.sqrt(pcov1[0,0]))
 
 
-ax.plot(vs,parms[0]*vs,ls = "--",marker = "None", label = "Fit med lineær model; $F = k\cdot v$, \n k = {0:0.3f} \n P-værdi: {1:0.3f}".format(parms[0],P), lw = 1)
+print(parms2)
+print(np.sqrt(np.diagonal(pcov2)))
 
-
+ax.plot(vs,parms1[0]*vs,ls = "--",marker = "None", label = "Fit med lineær model; $F = k\cdot v$ \n P-værdi: {1:0.3f}".format(parms1[0],P1), lw = 1)
+ax.plot(vs,fit2(vs,*parms2),ls = "--",marker = "None", label = "Fit med poly. model; $F = a\cdot v^5+b\cdot v^3+c\cdot v$, \n P-værdi: {1:0.3f}".format(parms2[0],P2), lw = 1)
+#aE*(mLod + mMagnet)**2 + gE*(mLod - mMagnet)**2 + mLodE*(a + g)**2 + mMagnetE*(a - g)**2
 #ax.errorbar(und.Spole.newVs,und.Spole.newFs,xerr = und.Spole.newVs_unc[0:-1],yerr = und.Spole.newFs_unc[0:-1],ls = "None", marker = ".", label = "Rå data Spole")
 #yerr = und.rør.newFs_unc,xerr = und.rør.newVs_unc
 
 labelfontsize = 12
+#ax.set_title(r"Bremse kraft som funktion af hastighed i Kobber Rør" "\n (Indenfor $\pm 0.4 \cdot L_{rør}$ af centrum)")
 ax.set_title(r"Bremse kraft som funktion af hastighed i 'åben' spole" "\n (Indenfor $\pm 0.4 \cdot L_{spole}$ af centrum)")
+#ax.set_title(r"Bremse kraft som funktion af hastighed i 'lukket' spole" "\n (Indenfor $\pm 0.4 \cdot L_{spole}$ af centrum)")
 ax.set_ylabel(r"$F_{brems} \quad [N]$", fontsize = labelfontsize)
 ax.set_xlabel(r"$v \quad [m/s]$",       fontsize = labelfontsize)
-
+ax.set_xlim([-30,30])
+ax.set_ylim([-4,8])
 #ax.set_ylabel(r"$y \quad [m]$")
 #ax.set_xlabel(r"$ts \quad [s]$")
 
